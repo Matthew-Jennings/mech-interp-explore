@@ -54,3 +54,37 @@ def cumul_probs_by_capitalisation_type(
             print(f"{pattern}: {100*cumul_prob:.2f}%")
 
     return cumul_probs
+
+
+def correct_incorrect_answers_for_top_spacetitleword(
+    logits_idx_sorted, model, topk_to_search=100
+):
+    """Generate a tuple of correct/incorrect answers by sampling the
+    first '<space><titleword>' token in `logits_sorted_idx` and finding
+    the corresponding incorrect versions. I.e.,
+    '<titleword>' (no space), '<space><lowerword>', and '<lowerword>'
+    """
+    predictions_sorted = model.to_str_tokens(logits_idx_sorted)
+
+    top_spacetitleword_prediction = next(
+        pred
+        for pred in predictions_sorted[:topk_to_search]  # Assume in first 100
+        if PATTERNS["Space, First Char Uppercase"].match(pred)
+    )
+    if top_spacetitleword_prediction is None:
+        return ValueError("No space-titleword token found in topk predictions.")
+
+    lowercase_counterpart_str_token = top_spacetitleword_prediction.lower()
+    nospace_counterpart_str_token = top_spacetitleword_prediction.lstrip()
+    nospace_lowercase_counterpart_str_token = lowercase_counterpart_str_token.lstrip()
+
+    answer_str_tokens = (
+        top_spacetitleword_prediction,
+        lowercase_counterpart_str_token,
+        nospace_counterpart_str_token,
+        nospace_lowercase_counterpart_str_token,
+    )
+
+    answer_tokens = model.to_tokens(answer_str_tokens).to(model.cfg.device)
+
+    return answer_tokens, answer_str_tokens
