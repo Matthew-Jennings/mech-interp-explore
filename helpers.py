@@ -64,27 +64,35 @@ def correct_incorrect_answers_for_top_spacetitleword(
     the corresponding incorrect versions. I.e.,
     '<titleword>' (no space), '<space><lowerword>', and '<lowerword>'
     """
-    predictions_sorted = model.to_str_tokens(logits_idx_sorted)
+    answer_str_tokens = []
+    answer_tokens = []
 
-    top_spacetitleword_prediction = next(
-        pred
-        for pred in predictions_sorted[:topk_to_search]  # Assume in first 100
-        if PATTERNS["Space, First Char Uppercase"].match(pred)
-    )
-    if top_spacetitleword_prediction is None:
-        return ValueError("No space-titleword token found in topk predictions.")
+    for logits_idx_sorted_batch in logits_idx_sorted:
+        predictions_sorted = model.to_str_tokens(logits_idx_sorted_batch)
 
-    lowercase_counterpart_str_token = top_spacetitleword_prediction.lower()
-    nospace_counterpart_str_token = top_spacetitleword_prediction.lstrip()
-    nospace_lowercase_counterpart_str_token = lowercase_counterpart_str_token.lstrip()
+        top_spacetitleword_prediction = next(
+            pred
+            for pred in predictions_sorted[:topk_to_search]  # Assume in first 100
+            if PATTERNS["Space, First Char Uppercase"].match(pred)
+        )
+        if top_spacetitleword_prediction is None:
+            return ValueError("No space-titleword token found in topk predictions.")
 
-    answer_str_tokens = (
-        top_spacetitleword_prediction,
-        lowercase_counterpart_str_token,
-        nospace_counterpart_str_token,
-        nospace_lowercase_counterpart_str_token,
-    )
+        lowercase_counterpart_str_token = top_spacetitleword_prediction.lower()
+        nospace_counterpart_str_token = top_spacetitleword_prediction.lstrip()
+        nospace_lowercase_counterpart_str_token = (
+            lowercase_counterpart_str_token.lstrip()
+        )
 
-    answer_tokens = model.to_tokens(answer_str_tokens).to(model.cfg.device)
+        answer_str_tokens.append(
+            (
+                top_spacetitleword_prediction,
+                lowercase_counterpart_str_token,
+                nospace_counterpart_str_token,
+                nospace_lowercase_counterpart_str_token,
+            )
+        )
+
+    answer_tokens.append(model.to_tokens(answer_str_tokens[-1]).to(model.cfg.device))
 
     return answer_tokens, answer_str_tokens
